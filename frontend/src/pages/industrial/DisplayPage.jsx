@@ -1,57 +1,142 @@
 /**
  * Display Page - Main Dashboard
  * Shows gauges for Frequency, Pressure, Temperature, and Viscosity
+ * Supports offline mode with localStorage persistence
  */
 
 import React, { useState, useEffect } from 'react';
-import { Box, Grid, Typography, Paper, Select, MenuItem, FormControl, InputLabel } from '@mui/material';
+import { Box, Grid, Typography, Paper, Select, MenuItem, FormControl, InputLabel, Chip } from '@mui/material';
 import CircularGauge from '../../components/gauges/CircularGauge';
 import LinearGauge from '../../components/gauges/LinearGauge';
 import apiClient from '../../api/apiClient';
+import { 
+  saveSensorData, 
+  loadSensorData,
+  saveDashboardConfig,
+  loadDashboardConfig 
+} from '../../utils/offlineStorage';
+import offlineDetector from '../../utils/offlineDetector';
+
+// Default sensor data - this will be saved and always displayed
+const DEFAULT_SENSOR_DATA = {
+  frequency: { amplitude: 45, frequence: 520 },
+  pressure: {
+    absolute: 680,
+    static: 720,
+    dynamic: 420,
+    psi_compers: 650,
+    psi_compers_s: 710,
+    psi_compers_2: 695,
+    psi_turbin: 385,
+    P_C: 45,
+    P_T: -28,
+  },
+  temperature: {
+    relative: 75,
+    surface: 82,
+    internal: 78,
+    point: 65,
+    fluctuating: 71,
+    freezing: -5,
+    dew_point: 15,
+    temp_vis: 80,
+    flash_point: 150,
+    TBN: 8,
+  },
+};
 
 const DisplayPage = () => {
-  const [sensorData, setSensorData] = useState({
-    frequency: { amplitude: 45, frequence: 520 },
-    pressure: {
-      absolute: 680,
-      static: 720,
-      dynamic: 420,
-      psi_compers: 650,
-      psi_compers_s: 710,
-      psi_compers_2: 695,
-      psi_turbin: 385,
-      P_C: 45,
-      P_T: -28,
-    },
-    temperature: {
-      relative: 75,
-      surface: 82,
-      internal: 78,
-      point: 65,
-      fluctuating: 71,
-      freezing: -5,
-      dew_point: 15,
-      temp_vis: 80,
-      flash_point: 150,
-      TBN: 8,
-    },
-  });
-
+  const [sensorData, setSensorData] = useState(DEFAULT_SENSOR_DATA);
   const [selectedSystem, setSelectedSystem] = useState('System 1');
   const [selectedGauge, setSelectedGauge] = useState('All Sensors');
   const [selectedSensor, setSelectedSensor] = useState('All Parameters');
+  const [isOnline, setIsOnline] = useState(offlineDetector.checkOnline());
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // Fetch real-time data
+  // Initialize: Load saved state on mount
   useEffect(() => {
+    // Load saved dashboard config
+    const savedConfig = loadDashboardConfig();
+    if (savedConfig) {
+      setSelectedSystem(savedConfig.selectedSystem || 'System 1');
+      setSelectedGauge(savedConfig.selectedGauge || 'All Sensors');
+      setSelectedSensor(savedConfig.selectedSensor || 'All Parameters');
+    }
+
+    // Load saved sensor data
+    const savedSensorData = loadSensorData();
+    if (savedSensorData && savedSensorData.frequency) {
+      // Remove savedAt timestamp before setting state
+      const { savedAt, ...data } = savedSensorData;
+      setSensorData(data);
+      console.log('[DisplayPage] Loaded saved sensor data from storage');
+    } else {
+      // Save default data on first load
+      saveSensorData(DEFAULT_SENSOR_DATA);
+      console.log('[DisplayPage] Saved default sensor data');
+    }
+
+    setIsInitialized(true);
+  }, []);
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const unsubscribe = offlineDetector.onStatusChange((online) => {
+      setIsOnline(online);
+      if (!online) {
+        // When going offline, load saved data
+        const savedData = loadSensorData();
+        if (savedData && savedData.frequency) {
+          const { savedAt, ...data } = savedData;
+          setSensorData(data);
+          console.log('[DisplayPage] Offline mode - using saved data');
+        }
+      }
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Save state whenever it changes
+  useEffect(() => {
+    if (isInitialized) {
+      saveDashboardConfig({
+        selectedSystem,
+        selectedGauge,
+        selectedSensor,
+      });
+    }
+  }, [selectedSystem, selectedGauge, selectedSensor, isInitialized]);
+
+  // Save sensor data periodically and on changes
+  useEffect(() => {
+    if (isInitialized) {
+      const saveInterval = setInterval(() => {
+        saveSensorData(sensorData);
+      }, 5000); // Save every 5 seconds
+
+      return () => clearInterval(saveInterval);
+    }
+  }, [sensorData, isInitialized]);
+
+  // Fetch real-time data (only when online)
+  useEffect(() => {
+    if (!isOnline) {
+      console.log('[DisplayPage] Offline - skipping API fetch');
+      return;
+    }
+
     const fetchData = async () => {
       try {
         const response = await apiClient.get('/data/real-time');
-        if (response.data) {
-          // Update with real data
-          // setSensorData(response.data);
+        if (response.data && response.data.frequency) {
+          // Update with real data and save it
+          setSensorData(response.data);
+          saveSensorData(response.data);
         }
       } catch (error) {
         console.error('Error fetching sensor data:', error);
+        // On error, continue using saved/local data
       }
     };
 
@@ -59,47 +144,72 @@ const DisplayPage = () => {
     const interval = setInterval(fetchData, 2000); // Update every 2 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isOnline]);
 
-  // Simulate real-time data updates
+  // Simulate real-time data updates (only when online, otherwise use saved static data)
   useEffect(() => {
+    if (!isOnline) {
+      // When offline, use saved static data - no simulation
+      return;
+    }
+
     const interval = setInterval(() => {
-      setSensorData((prev) => ({
-        frequency: {
-          amplitude: Math.max(30, Math.min(60, prev.frequency.amplitude + (Math.random() - 0.5) * 3)),
-          frequence: Math.max(480, Math.min(580, prev.frequency.frequence + (Math.random() - 0.5) * 15)),
-        },
-        pressure: {
-          absolute: Math.max(600, Math.min(750, prev.pressure.absolute + (Math.random() - 0.5) * 10)),
-          static: Math.max(650, Math.min(800, prev.pressure.static + (Math.random() - 0.5) * 12)),
-          dynamic: Math.max(350, Math.min(500, prev.pressure.dynamic + (Math.random() - 0.5) * 10)),
-          psi_compers: Math.max(600, Math.min(700, prev.pressure.psi_compers + (Math.random() - 0.5) * 8)),
-          psi_compers_s: Math.max(660, Math.min(760, prev.pressure.psi_compers_s + (Math.random() - 0.5) * 8)),
-          psi_compers_2: Math.max(650, Math.min(740, prev.pressure.psi_compers_2 + (Math.random() - 0.5) * 8)),
-          psi_turbin: Math.max(340, Math.min(430, prev.pressure.psi_turbin + (Math.random() - 0.5) * 8)),
-          P_C: Math.max(-60, Math.min(60, prev.pressure.P_C + (Math.random() - 0.5) * 4)),
-          P_T: Math.max(-60, Math.min(60, prev.pressure.P_T + (Math.random() - 0.5) * 4)),
-        },
-        temperature: {
-          relative: Math.max(65, Math.min(85, prev.temperature.relative + (Math.random() - 0.5) * 2)),
-          surface: Math.max(75, Math.min(90, prev.temperature.surface + (Math.random() - 0.5) * 2)),
-          internal: Math.max(70, Math.min(85, prev.temperature.internal + (Math.random() - 0.5) * 2)),
-          point: Math.max(55, Math.min(75, prev.temperature.point + (Math.random() - 0.5) * 2)),
-          fluctuating: Math.max(60, Math.min(80, prev.temperature.fluctuating + (Math.random() - 0.5) * 2)),
-          freezing: Math.max(-10, Math.min(5, prev.temperature.freezing + (Math.random() - 0.5) * 1)),
-          dew_point: Math.max(10, Math.min(25, prev.temperature.dew_point + (Math.random() - 0.5) * 1)),
-          temp_vis: Math.max(70, Math.min(90, prev.temperature.temp_vis + (Math.random() - 0.5) * 2)),
-          flash_point: Math.max(140, Math.min(160, prev.temperature.flash_point + (Math.random() - 0.5) * 2)),
-          TBN: Math.max(6, Math.min(12, prev.temperature.TBN + (Math.random() - 0.5) * 0.5)),
-        },
-      }));
+      setSensorData((prev) => {
+        const updated = {
+          frequency: {
+            amplitude: Math.max(30, Math.min(60, prev.frequency.amplitude + (Math.random() - 0.5) * 3)),
+            frequence: Math.max(480, Math.min(580, prev.frequency.frequence + (Math.random() - 0.5) * 15)),
+          },
+          pressure: {
+            absolute: Math.max(600, Math.min(750, prev.pressure.absolute + (Math.random() - 0.5) * 10)),
+            static: Math.max(650, Math.min(800, prev.pressure.static + (Math.random() - 0.5) * 12)),
+            dynamic: Math.max(350, Math.min(500, prev.pressure.dynamic + (Math.random() - 0.5) * 10)),
+            psi_compers: Math.max(600, Math.min(700, prev.pressure.psi_compers + (Math.random() - 0.5) * 8)),
+            psi_compers_s: Math.max(660, Math.min(760, prev.pressure.psi_compers_s + (Math.random() - 0.5) * 8)),
+            psi_compers_2: Math.max(650, Math.min(740, prev.pressure.psi_compers_2 + (Math.random() - 0.5) * 8)),
+            psi_turbin: Math.max(340, Math.min(430, prev.pressure.psi_turbin + (Math.random() - 0.5) * 8)),
+            P_C: Math.max(-60, Math.min(60, prev.pressure.P_C + (Math.random() - 0.5) * 4)),
+            P_T: Math.max(-60, Math.min(60, prev.pressure.P_T + (Math.random() - 0.5) * 4)),
+          },
+          temperature: {
+            relative: Math.max(65, Math.min(85, prev.temperature.relative + (Math.random() - 0.5) * 2)),
+            surface: Math.max(75, Math.min(90, prev.temperature.surface + (Math.random() - 0.5) * 2)),
+            internal: Math.max(70, Math.min(85, prev.temperature.internal + (Math.random() - 0.5) * 2)),
+            point: Math.max(55, Math.min(75, prev.temperature.point + (Math.random() - 0.5) * 2)),
+            fluctuating: Math.max(60, Math.min(80, prev.temperature.fluctuating + (Math.random() - 0.5) * 2)),
+            freezing: Math.max(-10, Math.min(5, prev.temperature.freezing + (Math.random() - 0.5) * 1)),
+            dew_point: Math.max(10, Math.min(25, prev.temperature.dew_point + (Math.random() - 0.5) * 1)),
+            temp_vis: Math.max(70, Math.min(90, prev.temperature.temp_vis + (Math.random() - 0.5) * 2)),
+            flash_point: Math.max(140, Math.min(160, prev.temperature.flash_point + (Math.random() - 0.5) * 2)),
+            TBN: Math.max(6, Math.min(12, prev.temperature.TBN + (Math.random() - 0.5) * 0.5)),
+          },
+        };
+        
+        // Save updated data
+        saveSensorData(updated);
+        
+        return updated;
+      });
     }, 2000); // Update every 2 seconds
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isOnline]);
 
   return (
     <Box sx={{ width: '100%', height: '100%' }}>
+      {/* Status Indicator */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'flex-end' }}>
+        <Chip
+          label={isOnline ? 'آنلاین' : 'آفلاین'}
+          color={isOnline ? 'success' : 'warning'}
+          size="small"
+          sx={{ 
+            fontFamily: 'Arial, sans-serif',
+            fontWeight: 'bold'
+          }}
+        />
+      </Box>
+
       {/* Top Controls */}
       <Box
         sx={{

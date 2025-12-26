@@ -1,5 +1,9 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig(async ({ mode }) => {
@@ -18,7 +22,10 @@ export default defineConfig(async ({ mode }) => {
   
   return {
     plugins: [
-      react(),
+      react({
+        // Fix for React hooks issues
+        jsxRuntime: 'automatic',
+      }),
       // Bundle analyzer - only in production builds
       visualizer && visualizer({
         open: false,
@@ -27,9 +34,32 @@ export default defineConfig(async ({ mode }) => {
         brotliSize: true,
       }),
     ].filter(Boolean),
+    resolve: {
+      // Dedupe React and other dependencies to prevent multiple instances
+      dedupe: [
+        'react',
+        'react-dom',
+        'react-router-dom',
+        '@emotion/react',
+        '@emotion/styled',
+      ],
+      alias: {
+        // Ensure single instance of React
+        'react': path.resolve(__dirname, './node_modules/react'),
+        'react-dom': path.resolve(__dirname, './node_modules/react-dom'),
+        '@emotion/react': path.resolve(__dirname, './node_modules/@emotion/react'),
+        '@emotion/styled': path.resolve(__dirname, './node_modules/@emotion/styled'),
+      },
+    },
     server: {
       port: 5178,
       strictPort: false, // Allow Vite to try next available port if 5178 is taken
+      hmr: {
+        // Fix WebSocket connection issues
+        protocol: 'ws',
+        host: 'localhost',
+        port: 5178,
+      },
     },
     // Exclude markdown files from being processed
     build: {
@@ -63,7 +93,13 @@ export default defineConfig(async ({ mode }) => {
         '@reduxjs/toolkit',
         'react-redux',
         'react-window',
+        '@emotion/react',
+        '@emotion/styled',
+        '@mui/material',
+        '@mui/icons-material',
       ],
+      // Force re-optimization to fix duplicate dependency issues
+      force: false,
     },
   }
 })
