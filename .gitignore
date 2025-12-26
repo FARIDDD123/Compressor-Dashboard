@@ -32,11 +32,13 @@ venv.bak/
 .venv/
 backend/venv/
 frontend/backend/venv/
+digital-twine-gas-turbine-1/**/venv/
 **/venv/
 **/env/
 
 # Node.js
 node_modules/
+**/node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -115,3 +117,10 @@ site/
 # yarn.lock
 # pnpm-lock.yaml
 
+# Additional project-specific ignores
+digital-twine-gas-turbine-1/frontend/node_modules/
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+htmlcov/
