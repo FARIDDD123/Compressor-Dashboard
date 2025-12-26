@@ -429,4 +429,4 @@ const Alarms = () => {
   );
 };
 
-export default Alarms;
+export default memo(Alarms);

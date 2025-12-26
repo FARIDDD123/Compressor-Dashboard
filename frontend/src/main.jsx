@@ -3,39 +3,18 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
+import { initializeErrorLogging } from './utils/errorLogger';
+import { initializeCsrfToken } from './utils/csrf';
+import performanceMonitor from './utils/performanceMonitor';
 
-// Add comprehensive error logging
-window.addEventListener('error', (event) => {
-  console.error('🚨 Global error:', event.error);
-  console.error('Error message:', event.message);
-  console.error('Error filename:', event.filename);
-  console.error('Error lineno:', event.lineno);
-  console.error('Error colno:', event.colno);
-  if (event.error?.stack) {
-    console.error('Error stack:', event.error.stack);
-  }
-  
-  // Show error on page
-  const rootEl = document.getElementById('root');
-  if (rootEl) {
-    rootEl.innerHTML = `
-      <div style="padding: 20px; color: red; background: #000; min-height: 100vh;">
-        <h1>🚨 JavaScript Error Detected</h1>
-        <p><strong>Message:</strong> ${event.message}</p>
-        <p><strong>File:</strong> ${event.filename}:${event.lineno}:${event.colno}</p>
-        <pre style="background: #1a1a1a; padding: 10px; overflow: auto;">${event.error?.stack || event.error?.toString() || 'No stack trace'}</pre>
-        <p>Check the browser console (F12) for more details.</p>
-      </div>
-    `;
-  }
-});
+// Initialize error logging service
+initializeErrorLogging();
 
-window.addEventListener('unhandledrejection', (event) => {
-  console.error('🚨 Unhandled promise rejection:', event.reason);
-  if (event.reason?.stack) {
-    console.error('Rejection stack:', event.reason.stack);
-  }
-});
+// Initialize CSRF token protection
+initializeCsrfToken();
+
+// Initialize performance monitoring
+performanceMonitor.init();
 
 // Check if root element exists
 const rootElement = document.getElementById('root');

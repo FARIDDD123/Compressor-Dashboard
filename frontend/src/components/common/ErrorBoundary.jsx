@@ -24,16 +24,26 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // Log error details for debugging
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    // Import error logger dynamically to avoid circular dependencies
+    import('../../utils/errorLogger').then(({ logError, ErrorSeverity, ErrorCategory }) => {
+      logError(error, {
+        severity: ErrorSeverity.CRITICAL,
+        category: ErrorCategory.RUNTIME,
+        additionalData: {
+          componentStack: errorInfo.componentStack,
+          errorBoundary: true,
+        },
+      });
+    }).catch((loggingError) => {
+      // Fallback to console if error logger fails
+      console.error('ErrorBoundary caught an error:', error, errorInfo);
+      console.error('Failed to log error:', loggingError);
+    });
     
     this.setState({
       error,
       errorInfo,
     });
-
-    // You can also log to an error reporting service here
-    // Example: logErrorToService(error, errorInfo);
   }
 
   handleReset = () => {

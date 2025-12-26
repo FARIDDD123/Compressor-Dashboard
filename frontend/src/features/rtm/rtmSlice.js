@@ -172,7 +172,7 @@ const initialState = {
   // Holds anomalies that arrive before their corresponding data point
   unmatchedAnomalies: {},
   status: 'idle', // 'idle' | 'loading' | 'succeeded' | 'failed'
-  maxDataPoints: 500,
+  maxDataPoints: 150, // Reduced from 500 for better performance
   isConnected: false,
   anomalyCauseCounts: {
     'High_Vibration': 156,

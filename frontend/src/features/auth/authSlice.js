@@ -1,7 +1,16 @@
 // src/features/auth/authSlice.js
 
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
+import apiClient from '../../api/apiClient';
+import { 
+  setToken, 
+  setUser, 
+  getToken, 
+  getUser, 
+  clearAuthData 
+} from '../../utils/storage';
+import { initializeCsrfToken } from '../../utils/csrf';
+import { logAuthError } from '../../utils/errorLogger';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -10,17 +19,25 @@ export const loginUser = createAsyncThunk(
   'auth/login',
   async ({ username, password }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+      const response = await apiClient.post(`${API_BASE_URL}/auth/login`, {
         username,
         password,
       });
       
-      // Store token in localStorage
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
+      // Store token in sessionStorage (more secure than localStorage)
+      if (response.data.token) {
+        setToken(response.data.token);
+      }
+      if (response.data.user) {
+        setUser(response.data.user);
+      }
+      
+      // Initialize CSRF token after successful login
+      initializeCsrfToken();
       
       return response.data;
     } catch (error) {
+      logAuthError(error, 'login');
       return rejectWithValue(
         error.response?.data?.message || 'Login failed'
       );
@@ -32,7 +49,7 @@ export const registerUser = createAsyncThunk(
   'auth/register',
   async ({ username, email, password, role }, { rejectWithValue }) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/auth/register`, {
+      const response = await apiClient.post(`${API_BASE_URL}/auth/register`, {
         username,
         email,
         password,
@@ -41,6 +58,7 @@ export const registerUser = createAsyncThunk(
       
       return response.data;
     } catch (error) {
+      logAuthError(error, 'register');
       return rejectWithValue(
         error.response?.data?.message || 'Registration failed'
       );
@@ -52,44 +70,39 @@ export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue }) => {
     try {
-      const token = localStorage.getItem('token');
+      const token = getToken();
       if (token) {
-        await axios.post(
-          `${API_BASE_URL}/auth/logout`,
-          {},
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        await apiClient.post(`${API_BASE_URL}/auth/logout`, {});
       }
     } catch (error) {
       // Continue with logout even if API call fails
-      console.error('Logout API error:', error);
+      logAuthError(error, 'logout');
     } finally {
-      // Always clear local storage
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      // Always clear sessionStorage (more secure)
+      clearAuthData();
     }
   }
 );
 
-// Load user from localStorage on app start
+// Load user from sessionStorage on app start
 const loadUserFromStorage = () => {
   try {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
+    const token = getToken();
+    const user = getUser();
     
     if (token && user) {
+      // Initialize CSRF token if user is authenticated
+      initializeCsrfToken();
+      
       return {
         isAuthenticated: true,
-        user: JSON.parse(user),
+        user,
         token,
       };
     }
   } catch (error) {
     console.error('Error loading user from storage:', error);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    clearAuthData();
   }
   
   return {
@@ -118,7 +131,7 @@ const authSlice = createSlice({
     },
     updateUser: (state, action) => {
       state.user = action.payload;
-      localStorage.setItem('user', JSON.stringify(action.payload));
+      setUser(action.payload);
     },
   },
   extraReducers: (builder) => {

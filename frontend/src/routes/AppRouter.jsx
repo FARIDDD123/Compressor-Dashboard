@@ -1,11 +1,12 @@
 // src/routes/AppRouter.jsx
 
-import React from 'react';
+import React, { Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import IndustrialLayout from '../layouts/IndustrialLayout';
 import Login from '../pages/Login.jsx';
 import ProtectedRoute from '../components/auth/ProtectedRoute.jsx';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 // Industrial Pages
 import DisplayPage from '../pages/industrial/DisplayPage';
@@ -35,18 +36,7 @@ const AppRouter = () => {
 
   return (
     <BrowserRouter>
-      <React.Suspense fallback={
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          minHeight: '100vh',
-          backgroundColor: '#000000',
-          color: '#8BC34A'
-        }}>
-          <div>Loading...</div>
-        </div>
-      }>
+      <Suspense fallback={<LoadingSpinner message="Loading Dashboard..." />}>
         <Routes>
           {/* Public Routes */}
           <Route 

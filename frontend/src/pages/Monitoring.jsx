@@ -1,6 +1,6 @@
 // src/pages/Monitoring.jsx
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, memo } from 'react';
 import { useSelector } from 'react-redux';
 import { Box, Chip, ButtonGroup, Button, Typography, Grid, Paper, Card, CardContent, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { ResponsiveContainer, BarChart, Bar, CartesianGrid, XAxis, YAxis, Tooltip, LineChart, Line, Legend } from 'recharts';
@@ -600,4 +600,4 @@ const Monitoring = () => {
   );
 };
 
-export default Monitoring;
+export default memo(Monitoring);
