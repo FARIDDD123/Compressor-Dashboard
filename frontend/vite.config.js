@@ -1,16 +1,26 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { visualizer } from 'vite-bundle-visualizer'
 
 // https://vite.dev/config/
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
   const isProduction = mode === 'production'
+  
+  // Dynamically import visualizer only in production
+  let visualizer = null
+  if (isProduction) {
+    try {
+      const { visualizer: viz } = await import('vite-bundle-visualizer')
+      visualizer = viz
+    } catch (e) {
+      console.warn('Bundle visualizer not available:', e.message)
+    }
+  }
   
   return {
     plugins: [
       react(),
       // Bundle analyzer - only in production builds
-      isProduction && visualizer({
+      visualizer && visualizer({
         open: false,
         filename: 'dist/stats.html',
         gzipSize: true,
@@ -52,6 +62,7 @@ export default defineConfig(({ mode }) => {
         'react-router-dom',
         '@reduxjs/toolkit',
         'react-redux',
+        'react-window',
       ],
     },
   }

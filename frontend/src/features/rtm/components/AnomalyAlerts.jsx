@@ -1,5 +1,4 @@
-import React, { useMemo, memo } from 'react';
-import { FixedSizeList } from 'react-window';
+import React, { useMemo, memo, useState, useEffect } from 'react';
 import { 
   ListItem, 
   ListItemText, 
@@ -125,8 +124,24 @@ AlertItem.displayName = 'AlertItem';
 
 // Main AlertsList Component with Virtualization
 const AlertsList = ({ alerts, height = 400 }) => {
+  const [FixedSizeList, setFixedSizeList] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Dynamically import react-window to avoid Vite module resolution issues
+  useEffect(() => {
+    import('react-window')
+      .then((module) => {
+        setFixedSizeList(() => module.FixedSizeList);
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.warn('Failed to load react-window, using fallback rendering:', error);
+        setIsLoading(false);
+      });
+  }, []);
+
   // Use virtualization for lists with more than 20 items
-  const shouldVirtualize = alerts.length > 20;
+  const shouldVirtualize = alerts.length > 20 && FixedSizeList;
   const itemHeight = 120; // Estimated height per item
 
   const itemData = useMemo(() => alerts, [alerts]);
@@ -141,8 +156,19 @@ const AlertsList = ({ alerts, height = 400 }) => {
     );
   }
 
+  // Show loading state while importing
+  if (isLoading && shouldVirtualize) {
+    return (
+      <Box sx={{ py: 4 }}>
+        <Typography variant="body1" sx={{ textAlign: 'center', color: '#666666' }}>
+          Loading alerts...
+        </Typography>
+      </Box>
+    );
+  }
+
   // Use virtualization for large lists
-  if (shouldVirtualize) {
+  if (shouldVirtualize && FixedSizeList) {
     return (
       <FixedSizeList
         height={height}
@@ -157,9 +183,9 @@ const AlertsList = ({ alerts, height = 400 }) => {
     );
   }
 
-  // Render small lists normally
+  // Render small lists normally (or fallback if virtualization failed)
   return (
-    <Box>
+    <Box sx={{ maxHeight: height, overflowY: 'auto' }}>
       {alerts.map((alert, index) => (
         <AlertItem
           key={`${alert.id}-${index}`}

@@ -1,6 +1,6 @@
 // src/pages/Alarms.jsx
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, memo } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { Box, Paper, Grid, Typography, Chip, Card, CardContent } from '@mui/material';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';

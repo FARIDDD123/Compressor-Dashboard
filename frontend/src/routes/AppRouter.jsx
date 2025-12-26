@@ -79,7 +79,7 @@ const AppRouter = () => {
           {/* Catch all - redirect to home */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </React.Suspense>
+      </Suspense>
     </BrowserRouter>
   );
 };
