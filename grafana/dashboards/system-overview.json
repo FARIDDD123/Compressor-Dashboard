@@ -1,0 +1,60 @@
+{
+  "dashboard": {
+    "title": "System Overview",
+    "tags": ["system", "overview"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "API Request Rate",
+        "targets": [
+          {
+            "expr": "rate(api_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "API Latency",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, api_request_duration_seconds_bucket)",
+            "legendFormat": "95th percentile"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Kafka Consumer Lag",
+        "targets": [
+          {
+            "expr": "kafka_consumer_lag_seconds",
+            "legendFormat": "{{topic}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "DVR Corrections",
+        "targets": [
+          {
+            "expr": "rate(dvr_corrections_total[5m])",
+            "legendFormat": "{{correction_type}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "RTM Anomalies",
+        "targets": [
+          {
+            "expr": "rate(rtm_anomalies_detected_total[5m])",
+            "legendFormat": "{{anomaly_type}}"
+          }
+        ],
+        "type": "graph"
+      }
+    ]
+  }
+}
+

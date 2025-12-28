@@ -1,0 +1,50 @@
+{
+  "dashboard": {
+    "title": "Data Quality Dashboard",
+    "tags": ["data", "quality", "dvr"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "DVR Validation Rate",
+        "targets": [
+          {
+            "expr": "rate(dvr_validations_total[5m])",
+            "legendFormat": "{{validation_type}} - {{result}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "DVR Correction Rate",
+        "targets": [
+          {
+            "expr": "rate(dvr_corrections_total[5m])",
+            "legendFormat": "{{correction_type}}"
+          }
+        ],
+        "type": "graph"
+      },
+      {
+        "title": "Data Quality Score",
+        "targets": [
+          {
+            "expr": "(dvr_validations_total{result=\"passed\"} / dvr_validations_total) * 100",
+            "legendFormat": "Quality Score %"
+          }
+        ],
+        "type": "singlestat"
+      },
+      {
+        "title": "Outlier Detection Rate",
+        "targets": [
+          {
+            "expr": "rate(rtm_anomalies_detected_total[5m])",
+            "legendFormat": "Anomalies/min"
+          }
+        ],
+        "type": "graph"
+      }
+    ]
+  }
+}
+

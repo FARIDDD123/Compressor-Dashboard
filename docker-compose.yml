@@ -1,0 +1,413 @@
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"  # SSL port (optional)
+    volumes:
+      # Mount certificates directory if SSL is enabled
+      - ./kafka_certs:/etc/kafka/secrets:ro
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      CLUSTER_ID: '${KAFKA_CLUSTER_ID}'
+      # Support both PLAINTEXT and SSL listeners
+      KAFKA_LISTENERS: 'PLAINTEXT://:9092,SSL://:9093,CONTROLLER://:9094'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,SSL://kafka:9093'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:9094'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL'
+      KAFKA_INTER_BROKER_LISTENER_NAME: '${KAFKA_INTER_BROKER_LISTENER:-PLAINTEXT}'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_CREATE_TOPICS: "sensors-raw:1:1,sensors-validated:1:1,alerts:1:1"
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      # SSL Configuration (only if certificates exist)
+      # KAFKA_SSL_KEYSTORE_LOCATION: '/etc/kafka/secrets/kafka.server.keystore.jks'
+      # KAFKA_SSL_KEYSTORE_PASSWORD: 'test1234'
+      # KAFKA_SSL_KEY_PASSWORD: 'test1234'
+      # KAFKA_SSL_TRUSTSTORE_LOCATION: '/etc/kafka/secrets/kafka.server.truststore.jks'
+      # KAFKA_SSL_TRUSTSTORE_PASSWORD: 'test1234'
+      # KAFKA_SSL_CLIENT_AUTH: 'none'
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    volumes:
+      - influxdb_data:/var/lib/influxdb2
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "influx", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  mysql:
+    image: mysql:8.0
+    container_name: mysql
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init:/docker-entrypoint-initdb.d
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      timeout: 20s
+      retries: 10
+      start_period: 10s
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg15
+    container_name: timescaledb
+    ports:
+      - "5433:5432"
+    volumes:
+      - timescaledb_data:/var/lib/postgresql/data
+      - ./init/timescaledb_init.sql:/docker-entrypoint-initdb.d/timescaledb_init.sql:ro
+    environment:
+      POSTGRES_DB: ${TIMESCALEDB_DATABASE:-digitaltwin}
+      POSTGRES_USER: ${TIMESCALEDB_USER:-postgres}
+      POSTGRES_PASSWORD: ${TIMESCALEDB_PASSWORD:-postgres}
+      TIMESCALEDB_TELEMETRY: ${TIMESCALEDB_TELEMETRY:-off}
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TIMESCALEDB_USER:-postgres}"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  # TimescaleDB Multi-node setup (optional, for production)
+  # Uncomment and configure for multi-node deployment
+  # timescaledb-data:
+  #   image: timescale/timescaledb:latest-pg15
+  #   container_name: timescaledb-data
+  #   environment:
+  #     POSTGRES_DB: ${TIMESCALEDB_DATABASE}
+  #     POSTGRES_USER: ${TIMESCALEDB_USER}
+  #     POSTGRES_PASSWORD: ${TIMESCALEDB_PASSWORD}
+  #   volumes:
+  #     - timescaledb_data_node:/var/lib/postgresql/data
+  #   command: postgres -c shared_preload_libraries=timescaledb
+  #   restart: unless-stopped
+
+  db-importer:
+    build: .
+    container_name: db-importer
+    command: python scripts/import_to_db.py
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      mysql:
+        condition: service_healthy
+    env_file:
+      - .env
+
+  db-streamer:
+    build: .
+    container_name: db-streamer
+    command: python -u backend/data_pipeline/db_streamer.py
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      db-importer:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_started
+    env_file:
+      - .env
+    restart: on-failure
+
+  influx-writer:
+    build: .
+    container_name: influx-writer
+    command: python -u backend/data_pipeline/kafka_consumer_influx.py
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      db-streamer:
+        condition: service_started
+      influxdb:
+        condition: service_started
+    env_file:
+      - .env
+    restart: on-failure
+
+  dvr-consumer:
+    build: .
+    container_name: dvr-consumer
+    command: python -u backend/data_pipeline/dvr_consumer.py
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      db-streamer:
+        condition: service_started
+    env_file:
+      - .env
+    restart: on-failure
+
+  rtm-consumer:
+    build: .
+    container_name: rtm-consumer
+    command: >
+      bash -c "sleep 10 && python -u backend/data_pipeline/rtm_consumer.py"
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      db-streamer:
+        condition: service_started
+    env_file:
+      - .env
+    restart: on-failure
+
+  rto-consumer:
+    build: .
+    container_name: rto-consumer
+    command: python -u backend/data_pipeline/rto_consumer.py
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      dvr-consumer:
+        condition: service_started
+      mysql:
+        condition: service_healthy
+    env_file:
+      - .env
+    restart: on-failure
+      
+  pdm-batch-runner:
+    build: .
+    container_name: pdm-batch-runner
+    command: python backend/data_pipeline/pdm_batch.py
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      influx-writer:
+        condition: service_started
+    env_file:
+      - .env
+
+  backend:
+    build: .
+    container_name: backend
+    command: gunicorn --worker-class eventlet --workers 1 --bind 0.0.0.0:5000 backend.api.app:app
+    ports:
+      - "5000:5000"
+      - "8000:8000"  # Prometheus metrics endpoint
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+    depends_on:
+      rto-consumer:
+        condition: service_started
+      pdm-batch-runner:
+        condition: service_completed_successfully
+    restart: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=grafana-influxdb-datasource
+    env_file:
+      - .env
+    depends_on:
+      - prometheus
+      - influxdb
+    restart: unless-stopped
+
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.18.0
+    container_name: mlflow
+    ports:
+      - "5001:5000"
+    environment:
+      - MLFLOW_BACKEND_STORE_URI=mysql+pymysql://${DB_USER}:${DB_PASSWORD}@mysql:3306/${DB_DATABASE}
+      - MLFLOW_DEFAULT_ARTIFACT_ROOT=s3://mlflow-artifacts/
+    volumes:
+      - mlflow_data:/mlflow
+    depends_on:
+      - mysql
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  edge-gateway:
+    build:
+      context: .
+      dockerfile: edge/Dockerfile
+    container_name: edge-gateway
+    ports:
+      - "8080:8080"  # Health check endpoint (optional)
+    environment:
+      - PYTHONPATH=/app
+      - EDGE_MODE=${EDGE_MODE:-auto}
+      - EDGE_RTM_ENABLED=${EDGE_RTM_ENABLED:-true}
+      - EDGE_DVR_ENABLED=${EDGE_DVR_ENABLED:-true}
+      - EDGE_ALERTS_ENABLED=${EDGE_ALERTS_ENABLED:-true}
+      - CLOUD_API_URL=http://backend:5000
+      - CLOUD_SYNC_ENABLED=${CLOUD_SYNC_ENABLED:-true}
+      - CLOUD_SYNC_INTERVAL=${CLOUD_SYNC_INTERVAL:-60}
+      - CLOUD_HEALTH_CHECK_INTERVAL=${CLOUD_HEALTH_CHECK_INTERVAL:-30}
+      - EDGE_DATA_RETENTION_HOURS=${EDGE_DATA_RETENTION_HOURS:-168}
+    volumes:
+      - edge_data:/app/edge_data
+      - ./artifacts:/app/artifacts:ro  # Read-only access to models
+    depends_on:
+      - backend
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0
+    container_name: mqtt-broker
+    ports:
+      - "1883:1883"   # MQTT port
+      - "9001:9001"   # WebSocket port
+    volumes:
+      - ./mqtt/config:/mosquitto/config:ro
+      - mqtt_data:/mosquitto/data
+      - mqtt_log:/mosquitto/log
+    environment:
+      - MOSQUITTO_USERNAME=${MQTT_USERNAME:-}
+      - MOSQUITTO_PASSWORD=${MQTT_PASSWORD:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mosquitto_sub", "-h", "localhost", "-t", "$$SYS/health", "-C", "1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  mqtt-consumer:
+    build: .
+    container_name: mqtt-consumer
+    command: python -u backend/data_pipeline/mqtt_consumer.py
+    environment:
+      - PYTHONPATH=/app
+      - MQTT_BROKER_HOST=mqtt-broker
+      - MQTT_BROKER_PORT=1883
+      - MQTT_USERNAME=${MQTT_USERNAME:-}
+      - MQTT_PASSWORD=${MQTT_PASSWORD:-}
+      - MQTT_TOPICS=${MQTT_TOPICS:-sensors/+/data,sensors/+/telemetry}
+      - KAFKA_BROKER_URL=kafka:9092
+      - KAFKA_RAW_TOPIC=sensors-raw
+    depends_on:
+      - mqtt-broker
+      - kafka
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  timescaledb-writer:
+    build: .
+    container_name: timescaledb-writer
+    command: python -u backend/data_pipeline/timescaledb_writer.py
+    environment:
+      - PYTHONPATH=/app
+      - KAFKA_BROKER_URL=kafka:9092
+      - KAFKA_RAW_TOPIC=sensors-raw
+      - TIMESCALEDB_HOST=timescaledb
+      - TIMESCALEDB_PORT=5432
+      - TIMESCALEDB_DATABASE=${TIMESCALEDB_DATABASE:-digitaltwin}
+      - TIMESCALEDB_USER=${TIMESCALEDB_USER:-postgres}
+      - TIMESCALEDB_PASSWORD=${TIMESCALEDB_PASSWORD:-postgres}
+      - TIMESCALEDB_BATCH_SIZE=${TIMESCALEDB_BATCH_SIZE:-1000}
+      - TIMESCALEDB_FLUSH_INTERVAL=${TIMESCALEDB_FLUSH_INTERVAL:-5.0}
+      - USE_UNIFIED_DB_CLIENT=${USE_UNIFIED_DB_CLIENT:-true}
+      - TIMESERIES_DB_TYPE=${TIMESERIES_DB_TYPE:-timescaledb}
+    depends_on:
+      - timescaledb
+      - kafka
+    env_file:
+      - .env
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  influxdb_data:
+  mysql_data:
+  prometheus_data:
+  grafana_data:
+  mlflow_data:
+  edge_data:
+  mqtt_data:
+  mqtt_log:
+  redis_data:
+  timescaledb_data:
+  # timescaledb_data_node:  # Uncomment for multi-node

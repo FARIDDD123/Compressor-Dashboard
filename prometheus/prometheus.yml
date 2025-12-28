@@ -1,0 +1,47 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'digital-twin-monitor'
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Backend API
+  - job_name: 'backend-api'
+    static_configs:
+      - targets: ['backend:8000']
+    metrics_path: '/metrics'
+
+  # Kafka Consumer Lag (via JMX Exporter if available)
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka:9092']
+
+  # DVR Consumer
+  - job_name: 'dvr-consumer'
+    static_configs:
+      - targets: ['dvr-consumer:8000']
+    metrics_path: '/metrics'
+
+  # RTM Consumer
+  - job_name: 'rtm-consumer'
+    static_configs:
+      - targets: ['rtm-consumer:8000']
+    metrics_path: '/metrics'
+
+  # RTO Consumer
+  - job_name: 'rto-consumer'
+    static_configs:
+      - targets: ['rto-consumer:8000']
+    metrics_path: '/metrics'
+
+  # InfluxDB (if metrics available)
+  - job_name: 'influxdb'
+    static_configs:
+      - targets: ['influxdb:8086']
+    metrics_path: '/metrics'
+

@@ -1,439 +1,173 @@
-# پیشنهادات به‌روزرسانی و بهینه‌سازی نرم‌افزار
-## Digital Twin Gas Turbine Dashboard
+# 🚀 بهینه‌سازی مدل‌های RTO، RUL و DVR
 
-**تاریخ:** 2025-01-27  
-**نسخه:** 1.0
+## 📈 **تحلیل عملکرد فعلی**
+
+### **1. RTO (Real-Time Optimization)**
+**وضعیت فعلی:**
+- الگوریتم: PPO (Proximal Policy Optimization)
+- معماری: Actor-Critic Networks
+- مشکل: عملکرد بهینه‌سازی نیاز به بهبود دارد
+
+**مشکلات شناسایی شده:**
+- تعداد epochs کم (100 epoch)
+- وزن‌های reward نامتعادل
+- نیاز به تنظیم hyperparameters
+
+### **2. RUL (Remaining Useful Life)**
+**وضعیت فعلی:**
+- الگوریتم: LSTM Network
+- MAE: 0.28 روز
+- R² Score: 0.72
+- معماری: 64 LSTM units
+
+**نقاط قوت:**
+- عملکرد قابل قبول
+- استفاده از Kalman Filter برای پیش‌پردازش
+- تبدیل به ONNX برای deployment
+
+### **3. DVR (Data Validation & Reconciliation)**
+**وضعیت فعلی:**
+- ✅ Rule-Based Checks
+- ✅ PCA-based anomaly detection  
+- ✅ Grubbs' test
+- ⏳ WLS (نیمه‌کاره)
+- ❌ Bayesian Inference (پیاده‌نشده)
 
 ---
 
-## 📋 فهرست اولویت‌ها
+## 🎯 **پیشنهادات بهینه‌سازی**
 
-### 🔴 اولویت بالا (Critical) - انجام فوری
+### **RTO Optimization**
 
-### 🟡 اولویت متوسط (High) - انجام در 1-2 هفته آینده
-
-### 🟢 اولویت پایین (Medium) - انجام در 1-2 ماه آینده
-
----
-
-## 🔴 اولویت بالا (Critical)
-
-### 1. امنیت (Security)
-
-#### 1.1 ذخیره‌سازی توکن (Token Storage)
-**مشکل:** توکن JWT در `localStorage` ذخیره می‌شود که در برابر XSS آسیب‌پذیر است.
-
-**راه‌حل:**
-- استفاده از `httpOnly` cookies برای ذخیره توکن
-- یا استفاده از `sessionStorage` به جای `localStorage`
-- پیاده‌سازی refresh token mechanism
-
-**فایل‌های مرتبط:**
-- `frontend/src/api/apiClient.js`
-- `frontend/src/features/auth/authSlice.js`
-
-**اولویت:** 🔴 Critical
-
----
-
-#### 1.2 احراز هویت WebSocket
-**مشکل:** اتصال WebSocket بدون احراز هویت انجام می‌شود.
-
-**راه‌حل:**
-```javascript
-// در webSocketClient.js
-this.socket = io(SOCKET_URL, {
-  auth: {
-    token: getToken()
-  },
-  reconnection: true,
-  reconnectionAttempts: 5,
-  reconnectionDelay: 2000,
-});
+#### **1. بهبود Hyperparameters**
+```python
+OPTIMIZED_CONFIG = {
+    "n_epochs": 200,  # افزایش از 100
+    "timesteps_per_epoch": 4096,  # افزایش از 2048
+    "actor_lr": 1e-4,  # کاهش learning rate
+    "critic_lr": 5e-4,
+    "gamma": 0.995,  # افزایش discount factor
+    "reward_weights": {
+        "efficiency": 10.0,  # افزایش وزن efficiency
+        "power": -0.005,  # کاهش penalty
+        "vibration": -0.2  # افزایش penalty برای vibration
+    }
+}
 ```
 
-**فایل مرتبط:**
-- `frontend/src/api/webSocketClient.js`
+#### **2. بهبود معماری شبکه**
+- افزایش عمق شبکه: [256, 128, 64]
+- اضافه کردن Batch Normalization
+- استفاده از Dropout برای regularization
 
-**اولویت:** 🔴 Critical
+#### **3. بهبود محیط شبیه‌سازی**
+- اضافه کردن noise واقعی‌تر
+- بهبود reward function
+- اضافه کردن constraints فیزیکی
 
----
+### **RUL Optimization**
 
-#### 1.3 محافظت در برابر CSRF
-**مشکل:** هیچ محافظتی در برابر CSRF وجود ندارد.
-
-**راه‌حل:**
-- اضافه کردن CSRF token به درخواست‌های API
-- استفاده از SameSite cookies
-- پیاده‌سازی double-submit cookie pattern
-
-**اولویت:** 🔴 Critical
-
----
-
-#### 1.4 مدیریت خطا و لاگ‌گیری امنیتی
-**مشکل:** خطاهای امنیتی لاگ نمی‌شوند.
-
-**راه‌حل:**
-- یکپارچه‌سازی با سرویس لاگ‌گیری (Sentry, LogRocket)
-- لاگ‌گیری تلاش‌های ناموفق احراز هویت
-- مانیتورینگ فعالیت‌های مشکوک
-
-**فایل مرتبط:**
-- `frontend/src/components/common/ErrorBoundary.jsx`
-- `frontend/src/main.jsx`
-
-**اولویت:** 🔴 Critical
-
----
-
-### 2. تست‌نویسی (Testing)
-
-#### 2.1 افزایش پوشش تست
-**مشکل:** 
-- فقط 2 فایل تست وجود دارد
-- Coverage threshold فقط 20% است (طبق SRS باید ≥85% باشد)
-
-**راه‌حل:**
-- افزایش coverage threshold به 85%
-- نوشتن تست برای تمام components
-- نوشتن تست برای Redux slices
-- نوشتن تست برای API calls و hooks
-
-**فایل مرتبط:**
-- `frontend/jest.config.js`
-
-**اولویت:** 🔴 Critical
-
----
-
-#### 2.2 تست‌های یکپارچه‌سازی (Integration Tests)
-**مشکل:** هیچ تست یکپارچه‌سازی وجود ندارد.
-
-**راه‌حل:**
-- تست جریان کامل احراز هویت
-- تست اتصال WebSocket و دریافت داده
-- تست تعامل با Redux store
-
-**اولویت:** 🔴 Critical
-
----
-
-### 3. مدیریت خطا (Error Handling)
-
-#### 3.1 مدیریت خطا در API Calls
-**مشکل:** مدیریت خطا ناقص است و خطاها به درستی handle نمی‌شوند.
-
-**راه‌حل:**
-```javascript
-// اضافه کردن retry logic
-// اضافه کردن timeout handling
-// بهبود error messages برای کاربر
+#### **1. بهبود معماری LSTM**
+```python
+IMPROVED_LSTM = {
+    "lstm_units": [128, 64],  # Multi-layer LSTM
+    "dropout": 0.2,
+    "recurrent_dropout": 0.2,
+    "batch_size": 64,  # کاهش از 128
+    "window_size": 120,  # افزایش از 60
+}
 ```
 
-**فایل مرتبط:**
-- `frontend/src/api/apiClient.js`
-- `frontend/src/hooks/useApiCall.js`
+#### **2. Feature Engineering بهتر**
+- اضافه کردن rolling statistics
+- استفاده از Fourier Transform برای frequency features
+- اضافه کردن lag features
 
-**اولویت:** 🔴 Critical
+#### **3. Ensemble Methods**
+- ترکیب LSTM با Random Forest
+- استفاده از Voting Regressor
+- Cross-validation بهتر
 
----
+### **DVR Optimization**
 
-## 🟡 اولویت متوسط (High)
-
-### 4. بهینه‌سازی عملکرد (Performance)
-
-#### 4.1 Code Splitting و Lazy Loading
-**مشکل:** تمام کد در یک bundle لود می‌شود.
-
-**راه‌حل:**
-```javascript
-// استفاده از React.lazy برای صفحات
-const Monitoring = React.lazy(() => import('./pages/Monitoring'));
-const Optimization = React.lazy(() => import('./pages/Optimization'));
-
-// استفاده از Suspense
-<Suspense fallback={<LoadingSpinner />}>
-  <Routes>...</Routes>
-</Suspense>
+#### **1. تکمیل WLS Implementation**
+```python
+def enhanced_wls_correction(self, df: pd.DataFrame) -> pd.DataFrame:
+    """
+    پیاده‌سازی کامل WLS برای تصحیح داده‌ها
+    """
+    # محاسبه وزن‌ها بر اساس uncertainty
+    # تصحیح مقادیر missing/noisy
+    # validation نتایج
+    pass
 ```
 
-**فایل مرتبط:**
-- `frontend/src/routes/AppRouter.jsx`
+#### **2. اضافه کردن Bayesian Inference**
+- استفاده از PyMC3 یا Stan
+- تخمین probabilistic مقادیر sensor
+- محاسبه confidence intervals
 
-**اولویت:** 🟡 High
-
----
-
-#### 4.2 بهینه‌سازی Redux State
-**مشکل:** 
-- داده‌های زیاد در Redux state نگهداری می‌شود (maxDataPoints: 500)
-- هیچ normalization انجام نشده
-
-**راه‌حل:**
-- استفاده از `normalizr` برای normalize کردن state
-- کاهش maxDataPoints به 100-150
-- استفاده از `reselect` برای memoized selectors
-
-**فایل مرتبط:**
-- `frontend/src/features/rtm/rtmSlice.js`
-
-**اولویت:** 🟡 High
+#### **3. بهبود PCA Threshold**
+- استفاده از adaptive thresholding
+- تنظیم بر اساس sensor type
+- اضافه کردن temporal analysis
 
 ---
 
-#### 4.3 Virtualization برای لیست‌های بزرگ
-**مشکل:** لیست‌های بزرگ (مثل alerts) بدون virtualization رندر می‌شوند.
+## 🔧 **Implementation Plan**
 
-**راه‌حل:**
-- استفاده از `react-window` یا `react-virtualized`
-- Virtualization برای جدول alerts
-- Virtualization برای charts با داده‌های زیاد
+### **Phase 1: RTO Optimization (اولویت بالا)**
+1. تنظیم hyperparameters جدید
+2. بهبود reward function
+3. افزایش training time
+4. validation با backtesting
 
-**اولویت:** 🟡 High
+### **Phase 2: RUL Enhancement (اولویت متوسط)**
+1. پیاده‌سازی multi-layer LSTM
+2. بهبود feature engineering
+3. اضافه کردن ensemble methods
+4. تست عملکرد
 
----
-
-#### 4.4 Memoization بیشتر
-**مشکل:** همه کامپوننت‌ها memoize نشده‌اند.
-
-**راه‌حل:**
-```javascript
-// استفاده از React.memo برای کامپوننت‌های گران
-export default React.memo(ExpensiveComponent);
-
-// استفاده از useMemo برای محاسبات پیچیده
-const expensiveValue = useMemo(() => {
-  return computeExpensiveValue(data);
-}, [data]);
-```
-
-**اولویت:** 🟡 High
+### **Phase 3: DVR Completion (اولویت متوسط)**
+1. تکمیل WLS implementation
+2. اضافه کردن Bayesian inference
+3. بهبود PCA thresholding
+4. integration testing
 
 ---
 
-#### 4.5 بهینه‌سازی Bundle Size
-**مشکل:** اندازه bundle بررسی نشده.
+## 📊 **Expected Performance Improvements**
 
-**راه‌حل:**
-- نصب و استفاده از `vite-bundle-visualizer`
-- حذف dependencies غیرضروری
-- استفاده از tree shaking بهتر
+### **RTO**
+- هدف: بهبود 15-20% در efficiency optimization
+- کاهش oscillation در control actions
+- بهتر شدن convergence
 
-**اولویت:** 🟡 High
+### **RUL**
+- هدف: MAE < 0.20 روز
+- R² Score > 0.80
+- بهبود generalization
 
----
-
-### 5. TypeScript Migration
-
-#### 5.1 تبدیل به TypeScript
-**مشکل:** پروژه از JavaScript استفاده می‌کند که خطاهای runtime ایجاد می‌کند.
-
-**راه‌حل:**
-- تبدیل تدریجی به TypeScript
-- شروع با فایل‌های API و utilities
-- سپس components و pages
-
-**اولویت:** 🟡 High
+### **DVR**
+- هدف: کاهش 30% false positives
+- بهبود data quality score
+- تشخیص دقیق‌تر sensor faults
 
 ---
 
-### 6. بهینه‌سازی WebSocket
+## ⚠️ **نکات مهم**
 
-#### 6.1 مدیریت Reconnection بهتر
-**مشکل:** منطق reconnection ساده است.
-
-**راه‌حل:**
-```javascript
-// Exponential backoff
-// تشخیص نوع خطا (network vs server)
-// نمایش وضعیت اتصال به کاربر
-```
-
-**فایل مرتبط:**
-- `frontend/src/api/webSocketClient.js`
-
-**اولویت:** 🟡 High
+1. **تست کامل**: هر تغییر باید با validation set تست شود
+2. **Monitoring**: اضافه کردن metrics برای real-time monitoring
+3. **Rollback Plan**: امکان برگشت به مدل قبلی در صورت مشکل
+4. **Documentation**: مستندسازی کامل تغییرات
 
 ---
 
-#### 6.2 Throttling و Debouncing
-**مشکل:** داده‌های WebSocket ممکن است با سرعت زیاد بیایند.
+## 🎯 **Success Metrics**
 
-**راه‌حل:**
-- استفاده از throttling برای به‌روزرسانی UI
-- Debouncing برای عملیات گران
+- **RTO**: Efficiency improvement, Stability, Response time
+- **RUL**: MAE, R², Prediction accuracy
+- **DVR**: Data quality score, False positive rate, Coverage
 
-**اولویت:** 🟡 High
-
----
-
-### 7. بهبود UX
-
-#### 7.1 Loading States بهتر
-**مشکل:** برخی صفحات loading state ندارند.
-
-**راه‌حل:**
-- اضافه کردن skeleton loaders
-- بهبود loading indicators
-- نمایش progress برای عملیات طولانی
-
-**اولویت:** 🟡 High
-
----
-
-#### 7.2 Offline Support
-**مشکل:** اپلیکیشن در حالت offline کار نمی‌کند.
-
-**راه‌حل:**
-- استفاده از Service Worker
-- Cache کردن داده‌های مهم
-- نمایش وضعیت offline به کاربر
-
-**اولویت:** 🟡 High
-
----
-
-## 🟢 اولویت پایین (Medium)
-
-### 8. به‌روزرسانی Dependencies
-
-#### 8.1 بررسی و به‌روزرسانی Packages
-**راه‌حل:**
-```bash
-npm outdated
-npm audit
-npm update
-```
-
-**اولویت:** 🟢 Medium
-
----
-
-### 9. بهبود Code Quality
-
-#### 9.1 ESLint Rules سخت‌تر
-**مشکل:** قوانین ESLint ساده هستند.
-
-**راه‌حل:**
-- اضافه کردن `eslint-plugin-react-hooks`
-- اضافه کردن `eslint-plugin-import`
-- اضافه کردن `eslint-plugin-jsx-a11y` برای accessibility
-
-**فایل مرتبط:**
-- `frontend/eslint.config.js`
-
-**اولویت:** 🟢 Medium
-
----
-
-#### 9.2 Prettier Configuration
-**مشکل:** هیچ formatter یکپارچه وجود ندارد.
-
-**راه‌حل:**
-- اضافه کردن Prettier
-- تنظیم pre-commit hooks با Husky
-
-**اولویت:** 🟢 Medium
-
----
-
-### 10. Documentation
-
-#### 10.1 بهبود Documentation
-**مشکل:** README ساده است.
-
-**راه‌حل:**
-- اضافه کردن API documentation
-- اضافه کردن component documentation
-- اضافه کردن architecture diagrams
-
-**اولویت:** 🟢 Medium
-
----
-
-### 11. Monitoring و Analytics
-
-#### 11.1 Performance Monitoring
-**راه‌حل:**
-- یکپارچه‌سازی با Google Analytics یا مشابه
-- مانیتورینگ Core Web Vitals
-- مانیتورینگ bundle size
-
-**اولویت:** 🟢 Medium
-
----
-
-### 12. Accessibility (a11y)
-
-#### 12.1 بهبود Accessibility
-**مشکل:** بررسی accessibility انجام نشده.
-
-**راه‌حل:**
-- اضافه کردن ARIA labels
-- بهبود keyboard navigation
-- تست با screen readers
-
-**اولویت:** 🟢 Medium
-
----
-
-## 📊 خلاصه اولویت‌ها
-
-| اولویت | تعداد موارد | زمان تخمینی |
-|--------|------------|-------------|
-| 🔴 Critical | 7 | 2-3 هفته |
-| 🟡 High | 12 | 4-6 هفته |
-| 🟢 Medium | 6 | 6-8 هفته |
-| **جمع** | **25** | **12-17 هفته** |
-
----
-
-## 🚀 برنامه اجرایی پیشنهادی
-
-### هفته 1-2: امنیت (Critical)
-1. پیاده‌سازی httpOnly cookies برای tokens
-2. اضافه کردن authentication به WebSocket
-3. پیاده‌سازی CSRF protection
-4. یکپارچه‌سازی error logging service
-
-### هفته 3-4: تست‌نویسی (Critical)
-1. افزایش coverage به 85%
-2. نوشتن تست برای components
-3. نوشتن تست برای Redux slices
-4. نوشتن integration tests
-
-### هفته 5-6: بهینه‌سازی عملکرد (High)
-1. پیاده‌سازی code splitting
-2. بهینه‌سازی Redux state
-3. اضافه کردن virtualization
-4. بهبود memoization
-
-### هفته 7-8: TypeScript و بهبودها (High/Medium)
-1. شروع migration به TypeScript
-2. بهبود WebSocket management
-3. بهبود UX و loading states
-
----
-
-## 📝 نکات مهم
-
-1. **تست‌ها را قبل از refactoring بنویسید** تا از regression جلوگیری شود
-2. **تغییرات را به صورت incremental انجام دهید** تا ریسک کاهش یابد
-3. **Performance metrics را قبل و بعد از بهینه‌سازی اندازه‌گیری کنید**
-4. **Documentation را همزمان با تغییرات به‌روز کنید**
-
----
-
-## 🔗 منابع مفید
-
-- [React Performance Optimization](https://react.dev/learn/render-and-commit)
-- [Redux Best Practices](https://redux.js.org/style-guide/)
-- [Web Security Best Practices](https://owasp.org/www-project-top-ten/)
-- [Testing Best Practices](https://testing-library.com/docs/react-testing-library/intro/)
-
----
-
-**تهیه شده توسط:** AI Assistant  
-**آخرین به‌روزرسانی:** 2025-01-27
-
+این بهینه‌سازی‌ها باعث بهبود قابل توجه عملکرد سیستم Digital Twin خواهد شد.

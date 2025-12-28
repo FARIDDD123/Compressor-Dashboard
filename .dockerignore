@@ -1,0 +1,27 @@
+# .dockerignore
+
+# Git files
+.git
+.gitignore
+.gitattributes
+
+# Docker files
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Python virtual environment and cache
+.venv
+__pycache__/
+*.pyc
+
+# IDE/Editor settings
+.vscode/
+.idea/
+
+# Local environment variables
+.env
+
+# Test artifacts
+.pytest_cache/
+temp_test_data/

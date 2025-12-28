@@ -7,12 +7,12 @@
 ## **1. Introduction**
 
 ### **1.1 Purpose**
-This document defines the **final and unified software requirements** for the **Industrial Gas Turbine Compressor (IGT-12MW Class) Dashboard**. The system is a complete solution for monitoring, predictive maintenance, and **closed-loop optimization**, integrating Cloud AI, Edge AI, a Digital Twin, and robust Data Governance.
+This document defines the **final and unified software requirements** for the **Industrial Gas Turbine Compressor (IGT-12MW Class) Dashboard**. The system is a complete solution for monitoring, predictive maintenance, and **closed-loop optimization**, integrating Cloud AI, Edge AI, a Digital Twin Gas Turbine 1, and robust Data Governance.
 
 ### **1.2 Scope**
 The comprehensive scope includes:
 - **Core Analytics:** **RTM**, **PdM**, and **DVR**.
-- **Advanced Control:** **RTO** with **Direct Closed-Loop Control** and **Digital Twin Validation**.
+- **Advanced Control:** **RTO** with **Direct Closed-Loop Control** and **Digital Twin Gas Turbine 1 Validation**.
 - **Data Architecture:** **Kafka** streaming, **InfluxDB** storage, and full MLOps/DevOps pipeline.
 - **Observability:** **Prometheus** for metrics and **Grafana** for dashboarding.
 - **Governance:** Enforcement of Data Quality and Data Lineage policies.
@@ -28,7 +28,7 @@ The comprehensive scope includes:
 | **Data Governance** | Management of data availability, usability, integrity, and security. |
 | **Kafka** | Apache Kafka: Distributed streaming platform. |
 | **InfluxDB** | High-performance Time-Series Database. |
-| **Digital Twin** | A virtual replica of the physical compressor for simulation. |
+| **Digital Twin Gas Turbine 1** | A virtual replica of the physical compressor for simulation. |
 | **Unit Test** | Automated testing of the smallest testable parts of an application ($\ge 85\%$ coverage). |
 
 ### **1.4 IGT-12MW Class Operational Profile (Generic Specifications)**
@@ -66,9 +66,9 @@ The architecture is centered around **Kafka** for high-throughput streaming and 
 - **FR-331 (Validation):** The **DVR** module **shall** enforce real-time **Data Quality** checks (range, completeness) and detect faulty sensors.
 - **FR-332 (Reconciliation):** Reconcile data via **WLS** and publish the corrected stream back to the **Kafka** pipeline.
 
-### **3.4 Real-Time Optimization (RTO) – Closed-Loop with Digital Twin**
+### **3.4 Real-Time Optimization (RTO) – Closed-Loop with Digital Twin Gas Turbine 1**
 - **FR-341:** The **RTO** module **shall** calculate optimal control setpoints using **MPC** and RL.
-- **FR-342 (Digital Twin Validation):** The **RTO** output **shall** be simulated by the integrated **Digital Twin** to validate the predicted outcome **before** execution.
+- **FR-342 (Digital Twin Gas Turbine 1 Validation):** The **RTO** output **shall** be simulated by the integrated **Digital Twin Gas Turbine 1** to validate the predicted outcome **before** execution.
 - **FR-343 (Direct Control):** Upon validation and Engineer approval, the **RTO** module **shall** execute parameter changes via a secured **OPC-UA Client** in a **Closed-Loop** manner.
 
 ### **3.5 Data Requirements and Sensor List (Mandatory Inputs)**
@@ -128,7 +128,7 @@ The system **shall** ingest and process high-frequency data points required for 
 - **Observability:** **Prometheus** and **Grafana**.
 
 ### **6.2 Advanced Subsystems**
-- **Digital Twin:** Physics-based modeling, high-speed interaction for RL training.
+- **Digital Twin Gas Turbine 1:** Physics-based modeling, high-speed interaction for RL training.
 - **Edge AI:** **RTM** models converted to **ONNX** format for local deployment.
 - **SCADA:** **OPC-UA Client** for **RTO** control, and **OPC-UA Server** for publishing AI results.
 
@@ -159,7 +159,7 @@ graph TB
     D --> E[Data Validation & Reconciliation]
     D --> F[Real-Time Monitoring]
     D --> G[Predictive Maintenance]
-    D --> H[Digital Twin]
+    D --> H[Digital Twin Gas Turbine 1]
     
     E --> I[InfluxDB TSDB]
     F --> I
@@ -262,7 +262,7 @@ graph TB
     style I fill:#e1f5fe
 ```
 
-### **9.4 Real-Time Optimization (RTO) with Digital Twin**
+### **9.4 Real-Time Optimization (RTO) with Digital Twin Gas Turbine 1**
 
 ```mermaid
 graph TB
@@ -271,7 +271,7 @@ graph TB
     D[Operational Constraints] --> B
     
     B --> E[Optimal Setpoints]
-    E --> F[Digital Twin Validation]
+    E --> F[Digital Twin Gas Turbine 1 Validation]
     
     F --> G{Simulation Results}
     G --> H[Safe for Implementation]

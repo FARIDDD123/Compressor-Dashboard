@@ -1,0 +1,16 @@
+# Edge Computing Requirements
+
+# Core dependencies
+numpy>=1.24.0
+pandas>=2.0.0
+onnxruntime>=1.15.0
+requests>=2.31.0
+
+# Database
+# SQLite is included in Python standard library
+
+# Logging (included in stdlib)
+
+# Optional: For better performance
+# scipy>=1.11.0  # Uncomment if needed for advanced DVR processing
+
