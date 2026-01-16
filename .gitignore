@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 venv/
 env/
+env-311/
 
 # Sensitive Files
 .env
